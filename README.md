@@ -1,100 +1,113 @@
-# Physics-Informed Heat-Diffusion Benchmark
+# Sensor Physics Studio
 
-A reproducible physics-informed neural network (PINN) for transient heat
-conduction in a one-dimensional slab, benchmarked against an independent SciPy
-method-of-lines solver. The PINN learns from the governing equation rather
-than from reference-solver training data.
+**A physics-modeling product prototype: connect real sensors to interpretable
+models, inspect a simulation, and validate predictions on data the model never
+saw.**
 
-## Physical problem
+The first vertical slice, **MotionLab**, calibrates and visualizes the
+differential-drive motion of a wheeled robot from wheel encoders and an
+inertial measurement unit (IMU). A second, independent example in this
+repository demonstrates a physics-informed neural network (PINN) for heat
+diffusion.
 
-The normalized temperature \(T(x,t)\) satisfies
+## Try MotionLab
 
-\[
-\frac{\partial T}{\partial t}
-= \alpha \frac{\partial^2 T}{\partial x^2},
-\qquad 0 < x < 1,\quad 0 < t \leq 0.5,
-\]
-
-with fixed-temperature boundaries \(T(0,t)=T(1,t)=0\), initial condition
-\(T(x,0)=\sin(\pi x)\), and diffusivity \(\alpha=0.1\). The spatial coordinate
-is normalized by slab thickness; temperature is normalized by the initial
-temperature scale, and time and diffusivity use the corresponding consistent
-normalized units.
-
-The exact solution is \(T(x,t)=\exp(-\alpha\pi^2t)\sin(\pi x)\). It provides an
-independent check on the SciPy reference solver, not training targets for the
-PINN. The reference solver discretizes space with second-order central
-differences and advances the resulting ODE system with SciPy's adaptive DOP853
-integrator.
-
-## PINN
-
-A fully connected `tanh` network takes position and time and predicts
-temperature. Its trial solution is
-
-\[
-T_\theta(x,t)=\sin(\pi x)+t\,x(1-x)N_\theta(x,t),
-\]
-
-which enforces both initial and boundary conditions exactly. Training
-minimizes the mean-squared strong-form residual
-\(T_t-\alpha T_{xx}\) over uniformly sampled interior collocation points; no
-reference-solver or analytical-solution values enter training. Random seeds
-are fixed for reproducible initialization and sampling.
-
-## Run
-
-Python 3.10 or later is required.
+Python 3.10 or later:
 
 ```powershell
-python -m pip install -e ".[test]"
+python -m pip install -e ".[app,test]"
+python -m streamlit run robotics_twin/app.py
 ```
 
-This installs the core dependencies declared in `pyproject.toml` together
-with the optional test dependency.
+Open the local URL printed by Streamlit. MotionLab starts immediately with a
+reproducible, synthetic 30-second robot drive. You can also explore the
+bundled [`example_robot_drive.csv`](./examples/example_robot_drive.csv) or
+click **Download example sensor log** to obtain it from the app. Change the
+wheel radius or training split to explore the calibration. Training uses the
+earlier data; held-out yaw-rate prediction error uses the later data.
 
-Train, compare, and write the figure:
+### CSV sensor format
+
+Provide one synchronized observation per row with these required,
+case-insensitive column names:
+
+| Column | Unit | Meaning |
+| --- | --- | --- |
+| `time_s` | seconds | Strictly increasing sensor timestamp |
+| `left_encoder_rad` | radians | Accumulated left wheel angle |
+| `right_encoder_rad` | radians | Accumulated right wheel angle |
+| `gyro_z_rad_s` | radians/second | IMU angular rate around the vertical axis |
+
+Both encoders must increase when their wheels move the robot forward. Sensor
+timestamps must be synchronized and strictly increasing; at least 12 samples
+are required. The uploaded log remains in the local Streamlit session.
+
+### What the robot model estimates
+
+Differential-drive kinematics predict yaw rate as
+\[
+\omega_z =
+\frac{r}{b}(\dot{\phi}_{right}-\dot{\phi}_{left}) + \beta,
+\]
+where \(r\) is wheel radius, \(b\) is effective track width, and \(\beta\) is
+constant gyroscope bias. MotionLab uses the supplied wheel radius, robustly
+fits \(r/b\) and \(\beta\) on the training portion, then reports prediction
+RMSE for gyroscope readings in the held-out portion. It integrates wheel
+encoder motion into an estimated planar trajectory and compares encoder
+heading with bias-corrected IMU heading.
+
+**Identifiability matters:** yaw-rate measurements determine the ratio
+\(r/b\), not wheel radius and track width independently. The user supplies a
+measured wheel radius; the app estimates effective track width. A log with
+straight-line motion alone cannot identify track width: include both left and
+right turns. Different sensors, another measured distance, or a known
+calibration maneuver can constrain other parameters.
+
+The reconstructed path is dead-reckoned odometry, not independently measured
+ground truth. This first prototype assumes planar motion, synchronized
+sensors, constant wheel radius, and no wheel slip. It does not infer geometry
+from camera images, calibrate wheel radius, estimate slip or acceleration, or
+reconstruct arbitrary robot dynamics. These are deliberate, explicit scope
+boundaries—not guarantees of unattended, general-purpose physics discovery.
+
+## Heat-transfer PINN benchmark
+
+The independent `thermal_pinn` example learns the one-dimensional heat
+equation
+
+\[
+T_t = \alpha T_{xx},\qquad T(0,t)=T(1,t)=0,\qquad
+T(x,0)=\sin(\pi x),
+\]
+
+with \(\alpha=0.1\). A neural network enforces the conditions exactly and
+minimizes the governing-equation residual without reference-solver training
+data. It is compared with a SciPy method-of-lines solution and an exact
+analytical solution.
 
 ```powershell
 python -m thermal_pinn
 ```
 
-The command prints the PINN-vs-SciPy RMSE and maximum absolute error, the
-SciPy-vs-analytical RMSE, and training residual diagnostics. It writes
-`reports/thermal_pinn_vs_scipy.png` and exits with an error if PINN RMSE exceeds
-0.03. Adjust runtime or output with `--steps`, `--collocation-points`,
-`--spatial-points`, `--seed`, `--max-rmse`, and `--plot`. For example:
-
-```powershell
-python -m thermal_pinn --steps 2500 --collocation-points 512
-```
-
-Run the tests with:
+## Tests
 
 ```powershell
 python -m pytest
 ```
 
-## Benchmark visualization
+The tests cover the analytical-versus-numerical heat solver, PINN conditions
+and training, robot CSV import and validation, physics-based wheelbase
+recovery, identifiability checks, and forward trajectory reconstruction.
 
-![PINN compared with the SciPy method-of-lines solver](reports/thermal_pinn_vs_scipy.png)
+## Roadmap: grow into a useful product
 
-Default run (`seed=42`, 2,500 Adam steps, 512 collocation points, 65 spatial
-points):
-
-| Metric | Result |
-| --- | ---: |
-| PINN RMSE vs. SciPy | 1.16e-4 |
-| PINN maximum absolute error vs. SciPy | 2.63e-4 |
-| SciPy RMSE vs. analytical solution | 2.80e-5 |
-| PDE-residual RMSE, initial → final sampled batch | 6.79e-1 → 1.75e-3 |
-
-## Scope and limitations
-
-This is a controlled forward-simulation benchmark, not a material-property
-estimator or a model calibrated against experimental data. The reference
-solution has spatial-discretization error; it is separately checked against
-the exact single-mode solution. The PINN's convergence and error depend on
-architecture, collocation sampling, optimization, and time horizon. The
-reported comparison measures this setup only and should not be interpreted as
-evidence that a PINN generally outperforms a conventional numerical solver.
+1. Collect sensor logs from a real mobile robot and verify units,
+   synchronization, and encoder direction.
+2. Compare the odometry trajectory with an independent reference, such as
+   motion capture, visual odometry, or measured course landmarks.
+3. Add additional sensor-model templates only when each can be calibrated and
+   tested against held-out real measurements.
+4. Explore camera-assisted geometry as a human-confirmed input, not a claim
+   that a single image reveals hidden physical properties.
+5. Keep estimated parameters, uncertainty, model assumptions, and validation
+   results visible so users can tell when a model is not supported by its data.

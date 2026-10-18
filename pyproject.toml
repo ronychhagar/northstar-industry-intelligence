@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "thermal-pinn-benchmark"
+name = "sensor-physics-studio"
 version = "1.0.0"
-description = "A physics-informed neural network benchmark for 1-D transient heat conduction"
+description = "Sensor-driven physics modeling, thermal PINNs, and robot-motion calibration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,13 +16,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+app = ["pandas>=2.0", "streamlit>=1.30"]
 test = ["pytest>=7"]
 
 [project.scripts]
+motionlab-robotics = "robotics_twin.app:main"
 thermal-pinn-benchmark = "thermal_pinn.experiment:main"
 
 [tool.setuptools.packages.find]
-include = ["thermal_pinn*"]
+include = ["robotics_twin*", "thermal_pinn*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
