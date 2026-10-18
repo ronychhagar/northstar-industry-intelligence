@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thermal-pinn-benchmark"
+version = "1.0.0"
+description = "A physics-informed neural network benchmark for 1-D transient heat conduction"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.6",
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+thermal-pinn-benchmark = "thermal_pinn.experiment:main"
+
+[tool.setuptools.packages.find]
+include = ["thermal_pinn*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
