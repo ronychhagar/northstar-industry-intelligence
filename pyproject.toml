@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sensor-physics-studio"
+name = "northstar-industry-intelligence"
 version = "1.0.0"
-description = "Sensor-driven physics modeling, thermal PINNs, and robot-motion calibration"
+description = "Multi-industry research-as-a-service workspace with an engineering calibration module"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -20,6 +20,7 @@ app = ["pandas>=2.0", "streamlit>=1.30"]
 test = ["pytest>=7"]
 
 [project.scripts]
+northstar-research = "robotics_twin.app:main"
 motionlab-robotics = "robotics_twin.app:main"
 thermal-pinn-benchmark = "thermal_pinn.experiment:main"
 

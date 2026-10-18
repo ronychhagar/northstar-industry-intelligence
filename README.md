@@ -1,16 +1,13 @@
-# Sensor Physics Studio
+# Northstar Industry Intelligence
 
-**A physics-modeling product prototype: connect real sensors to interpretable
-models, inspect a simulation, and validate predictions on data the model never
-saw.**
+**A multi-industry research-as-a-service workspace.** Northstar helps teams in
+automotive, robotics, semiconductors, and embedded systems turn strategic
+questions into scoped research briefs, track engagements, and structure
+market, competitor, technology, and customer research in one client-facing
+desk. Research dimensions and signal watchlists adapt to the selected industry.
+MotionLab remains available as a robotics engineering module.
 
-The first vertical slice, **MotionLab**, calibrates and visualizes the
-differential-drive motion of a wheeled robot from wheel encoders and an
-inertial measurement unit (IMU). A second, independent example in this
-repository demonstrates a physics-informed neural network (PINN) for heat
-diffusion.
-
-## Try MotionLab
+## Start the workspace
 
 Python 3.10 or later:
 
@@ -19,71 +16,64 @@ python -m pip install -e ".[app,test]"
 python -m streamlit run robotics_twin/app.py
 ```
 
-Open the local URL printed by Streamlit. MotionLab starts immediately with a
-reproducible, synthetic 30-second robot drive. You can also explore the
-bundled [`example_robot_drive.csv`](./examples/example_robot_drive.csv) or
-click **Download example sensor log** to obtain it from the app. Change the
-wheel radius or training split to explore the calibration. Training uses the
-earlier data; held-out yaw-rate prediction error uses the later data.
+Open the local URL printed by Streamlit. Select an **Industry workspace** in
+the sidebar, then open **Research requests** to submit a decision-led brief.
+Each request stores its industry, research focus, decision, geography,
+competitors or technologies, deliverable, target date, and context. Track its
+status, add research-team notes, download an individual brief as JSON, or
+export the engagement list as CSV.
 
-### CSV sensor format
+The SQLite database is `automotive_research.db` at the project root. Existing
+databases are migrated automatically, with existing requests assigned to
+Automotive. Keep this file backed up if it contains client information. This is
+a local workspace; it does not include hosted accounts, multi-user access
+controls, or shared cloud storage.
 
-Provide one synchronized observation per row with these required,
-case-insensitive column names:
+## Industry workspaces
+
+- **Automotive:** EVs, charging, software-defined vehicles, ADAS, fleets,
+  battery supply chains, and aftermarket.
+- **Robotics:** industrial automation, collaborative robots, mobile robots,
+  humanoids, deployment economics, safety, and systems integration.
+- **Semiconductors:** AI accelerators, automotive chips, power devices,
+  process and packaging technology, capacity, design wins, and supply risk.
+- **Embedded systems:** compute platforms, RTOS and software, connectivity,
+  edge AI, safety, security, product lifecycle, and component availability.
+
+The shared **Market monitor**, **Competitor landscape**, and **Technology
+radar** adapt their lenses, signal watchlists, comparison dimensions, and
+assessment factors to the selected industry. Market figures and competitor
+findings are intentionally not pre-populated. Add dated, attributable evidence
+and methodology before using a finding in a business decision. Every estimate
+should state its definition, geography, time period, source, and confidence.
+
+## MotionLab sensor format
+
+Upload a synchronized CSV with one observation per row and these required,
+case-insensitive columns:
 
 | Column | Unit | Meaning |
 | --- | --- | --- |
-| `time_s` | seconds | Strictly increasing sensor timestamp |
+| `time_s` | seconds | Strictly increasing timestamp |
 | `left_encoder_rad` | radians | Accumulated left wheel angle |
 | `right_encoder_rad` | radians | Accumulated right wheel angle |
 | `gyro_z_rad_s` | radians/second | IMU angular rate around the vertical axis |
 
-Both encoders must increase when their wheels move the robot forward. Sensor
-timestamps must be synchronized and strictly increasing; at least 12 samples
+Both encoders must increase when their wheels move forward. At least 12 samples
 are required. The uploaded log remains in the local Streamlit session.
 
-### What the robot model estimates
-
-Differential-drive kinematics predict yaw rate as
-\[
-\omega_z =
-\frac{r}{b}(\dot{\phi}_{right}-\dot{\phi}_{left}) + \beta,
-\]
-where \(r\) is wheel radius, \(b\) is effective track width, and \(\beta\) is
-constant gyroscope bias. MotionLab uses the supplied wheel radius, robustly
-fits \(r/b\) and \(\beta\) on the training portion, then reports prediction
-RMSE for gyroscope readings in the held-out portion. It integrates wheel
-encoder motion into an estimated planar trajectory and compares encoder
-heading with bias-corrected IMU heading.
-
-**Identifiability matters:** yaw-rate measurements determine the ratio
-\(r/b\), not wheel radius and track width independently. The user supplies a
-measured wheel radius; the app estimates effective track width. A log with
-straight-line motion alone cannot identify track width: include both left and
-right turns. Different sensors, another measured distance, or a known
-calibration maneuver can constrain other parameters.
-
-The reconstructed path is dead-reckoned odometry, not independently measured
-ground truth. This first prototype assumes planar motion, synchronized
-sensors, constant wheel radius, and no wheel slip. It does not infer geometry
-from camera images, calibrate wheel radius, estimate slip or acceleration, or
-reconstruct arbitrary robot dynamics. These are deliberate, explicit scope
-boundaries—not guarantees of unattended, general-purpose physics discovery.
+The model uses the supplied wheel radius and fits effective track width and
+constant gyroscope bias. The yaw-rate model is checked on later held-out
+readings. Track width cannot be identified from straight-line motion alone;
+include both left and right turns. The reconstructed path is dead-reckoned
+odometry, not independently measured ground truth, and assumes planar motion,
+synchronized sensors, and no wheel slip.
 
 ## Heat-transfer PINN benchmark
 
 The independent `thermal_pinn` example learns the one-dimensional heat
-equation
-
-\[
-T_t = \alpha T_{xx},\qquad T(0,t)=T(1,t)=0,\qquad
-T(x,0)=\sin(\pi x),
-\]
-
-with \(\alpha=0.1\). A neural network enforces the conditions exactly and
-minimizes the governing-equation residual without reference-solver training
-data. It is compared with a SciPy method-of-lines solution and an exact
-analytical solution.
+equation and compares its physics-informed neural network with numerical and
+analytical solutions:
 
 ```powershell
 python -m thermal_pinn
@@ -94,20 +84,3 @@ python -m thermal_pinn
 ```powershell
 python -m pytest
 ```
-
-The tests cover the analytical-versus-numerical heat solver, PINN conditions
-and training, robot CSV import and validation, physics-based wheelbase
-recovery, identifiability checks, and forward trajectory reconstruction.
-
-## Roadmap: grow into a useful product
-
-1. Collect sensor logs from a real mobile robot and verify units,
-   synchronization, and encoder direction.
-2. Compare the odometry trajectory with an independent reference, such as
-   motion capture, visual odometry, or measured course landmarks.
-3. Add additional sensor-model templates only when each can be calibrated and
-   tested against held-out real measurements.
-4. Explore camera-assisted geometry as a human-confirmed input, not a claim
-   that a single image reveals hidden physical properties.
-5. Keep estimated parameters, uncertainty, model assumptions, and validation
-   results visible so users can tell when a model is not supported by its data.
